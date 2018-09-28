@@ -1,0 +1,141 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+
+namespace _Lab1
+{
+    class Program
+    {
+        public delegate void TaskDelegate();
+
+        public class TaskQueue: IDisposable
+        {
+
+            Thread[] ThreadsPool;
+            int ThreadsNum = 0;
+            object lockobj = new object();
+
+             Queue<Tuple<TaskDelegate, object>> TaskDelegateQueue = new Queue<Tuple<TaskDelegate,object>>();
+
+            public TaskQueue(int ThreadsNum)
+            {
+                ThreadsPool = new Thread[ThreadsNum];
+                this.ThreadsNum = ThreadsNum;
+                for (int n = 0; n < ThreadsNum; n++)
+                {
+                    ThreadsPool[n] = new Thread(CompletingTasks) {IsBackground = true};
+                    ThreadsPool[n].Start();
+                }
+            }
+
+            public void EnqueueTask(TaskDelegate task, object state = null)
+            {
+                TaskDelegateQueue.Enqueue(new Tuple<TaskDelegate, object>(task, state));
+            }
+            
+            void CompletingTasks()
+            {
+                while (true)
+                { 
+                    if (TaskDelegateQueue.Count > 0)
+                    {
+                        lock (lockobj)
+                        {
+                            if (TaskDelegateQueue.Count > 0)
+                            {
+                                Tuple<TaskDelegate, object> task = TaskDelegateQueue.Dequeue();
+                                task.Item1?.Invoke(task.Item2);
+                            }
+                        }
+                    }
+                }
+            }
+
+            public void Dispose()
+            {
+                for (int n=0; n<ThreadsNum; n++)
+                {
+                    ThreadsPool[n].Interrupt();
+                }
+            }
+        }
+
+        public static class FilesCopier: IDisposable
+        {
+
+            private static CountdownEvent EventCounter;
+            private static TaskQueue q;
+            
+            private static void CopyFile(object source_dest)
+            {
+                try
+                {
+                    Tuple<string, string> source_target = (Tuple<string, string>)source_dest;
+                    File.Copy(source_target.Item1, source_target.Item2,true);
+                    //Console.WriteLine("File " + source_target.Item1 + " is copied");
+                    EventCounter.Signal();
+                }
+                catch (InvalidCastException)
+                {
+                    Console.WriteLine("Incorrect parameter passing: method CopyFile(object source_dest); source_dest:" + source_dest.ToString());
+                }
+            }
+
+
+            private static void CheckDirNames(string[] args, out string source, out string dest)
+            {
+                if (args.Length < 2)
+                {
+                    throw new Exception("Not enough arguments (" + args.Length + "). Usage: source directory name, target directory name.");
+                }
+                source = args[0];
+                dest = args[1];
+                if (source == dest)
+                {
+                    throw new Exception("Source and destination directories should not coincide.");
+                }
+                if (!Directory.Exists(source))
+                {
+                    throw new Exception("Source directory does not exist.");
+                }
+            }
+
+            public static int CopyFiles(string source_dir, string target_dir)
+            {
+                if (!Directory.Exists(target_dir))
+                {
+                    Directory.CreateDirectory(target_dir);
+                }
+                string[] files_names = Directory.GetFiles(source_dir);
+                int files_num = files_names.Length;
+                EventCounter = new CountdownEvent (files_num);
+                using (TaskQueue q = new TaskQueue())
+                {
+                    foreach (string filename in files_names)
+                    {
+                        Tuple<string, string> source_dest = new Tuple<string, string>(filename, filename.Replace(source_dir, target_dir));
+                        q.EnqueueTask(CopyFile, source_dest);
+                    }
+                    EventCounter.Wait();
+                }
+                return files_num;
+            }
+        }
+
+    static void Main(string[] args)
+        {
+            string source_dir, target_dir;
+            try
+            {
+                FileCopier.CheckDirNames(args, out source_dir, out target_dir);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return;
+            }
+            Console.WriteLine(FileCopier.CopyFiles(source_dir, target_dir) + " files copied");
+            Console.ReadLine();
+        }
+    }
+}
