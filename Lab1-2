@@ -1,21 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.IO;
 
-namespace _Lab1
+namespace Lab2
 {
     class Program
     {
-        public delegate void TaskDelegate();
+        public delegate void TaskDelegate(object state = null);
 
-        public class TaskQueue: IDisposable
+        public class TaskQueue : IDisposable
         {
 
             Thread[] ThreadsPool;
             int ThreadsNum = 0;
             object lockobj = new object();
 
-             Queue<Tuple<TaskDelegate, object>> TaskDelegateQueue = new Queue<Tuple<TaskDelegate,object>>();
+            Queue<Tuple<TaskDelegate, object>> TaskDelegateQueue = new Queue<Tuple<TaskDelegate,object>>();
 
             public TaskQueue(int ThreadsNum)
             {
@@ -23,7 +24,7 @@ namespace _Lab1
                 this.ThreadsNum = ThreadsNum;
                 for (int n = 0; n < ThreadsNum; n++)
                 {
-                    ThreadsPool[n] = new Thread(CompletingTasks) {IsBackground = true};
+                    ThreadsPool[n] = new Thread(CompletingTasks) { IsBackground = true };
                     ThreadsPool[n].Start();
                 }
             }
@@ -32,11 +33,11 @@ namespace _Lab1
             {
                 TaskDelegateQueue.Enqueue(new Tuple<TaskDelegate, object>(task, state));
             }
-            
+
             void CompletingTasks()
             {
                 while (true)
-                { 
+                {
                     if (TaskDelegateQueue.Count > 0)
                     {
                         lock (lockobj)
@@ -53,19 +54,27 @@ namespace _Lab1
 
             public void Dispose()
             {
-                for (int n=0; n<ThreadsNum; n++)
+                for (int n = 0; n < ThreadsNum; n++)
                 {
                     ThreadsPool[n].Interrupt();
                 }
+
             }
+
         }
 
-        public static class FilesCopier: IDisposable
+        public class FilesCopier: IDisposable
         {
 
             private static CountdownEvent EventCounter;
             private static TaskQueue q;
-            
+
+            public FilesCopier()
+            {
+                q = new TaskQueue(3);
+                EventCounter = new CountdownEvent(1);
+            }
+
             private static void CopyFile(object source_dest)
             {
                 try
@@ -100,32 +109,39 @@ namespace _Lab1
                 }
             }
 
-            public static int CopyFiles(string source_dir, string target_dir)
+            public int CopyFiles(string source_dir, string target_dir)
             {
                 if (!Directory.Exists(target_dir))
                 {
                     Directory.CreateDirectory(target_dir);
                 }
                 string[] files_names = Directory.GetFiles(source_dir);
+                string[] dirs_names = Directory.GetDirectories(source_dir);
                 int files_num = files_names.Length;
-                EventCounter = new CountdownEvent (files_num);
-                using (TaskQueue q = new TaskQueue())
+                EventCounter.AddCount(files_num);
+                foreach (string filename in files_names)
                 {
-                    foreach (string filename in files_names)
-                    {
-                        Tuple<string, string> source_dest = new Tuple<string, string>(filename, filename.Replace(source_dir, target_dir));
-                        q.EnqueueTask(CopyFile, source_dest);
-                    }
-                    EventCounter.Wait();
+                    Tuple<string, string> source_dest = new Tuple<string, string>(filename, filename.Replace(source_dir, target_dir));
+                    q.EnqueueTask(CopyFile, source_dest);
+                }
+                foreach (string dir in dirs_names)
+                {
+                    string newsource_dir = Path.Combine(source_dir, dir);
+                    files_num +=CopyFiles(newsource_dir, newsource_dir.Replace(source_dir,target_dir));
                 }
                 return files_num;
             }
+
+            public void Dispose ()
+            {
+                EventCounter.Signal();
+                EventCounter.Wait();
+                q.Dispose();
+            }
         }
 
-    static void Main(string[] args)
+        static void Main(string[] args)
         {
-            string source_dir, target_dir;
-            try
             {
                 FileCopier.CheckDirNames(args, out source_dir, out target_dir);
             }
@@ -134,8 +150,14 @@ namespace _Lab1
                 Console.WriteLine(e.Message);
                 return;
             }
-            Console.WriteLine(FileCopier.CopyFiles(source_dir, target_dir) + " files copied");
+            int f_counter=0;
+            using (FilesCopier fc = new FilesCopier())
+            {
+                f_counter = fc.CopyFiles(source_dir, target_dir);
+            }
+            Console.WriteLine(f_counter + " files copied");
             Console.ReadLine();
         }
     }
 }
+
