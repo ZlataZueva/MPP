@@ -1,0 +1,31 @@
+
+using System;
+using System.Threading;
+
+namespace Lab3
+{
+    class Program
+    {
+public class Mutex
+        {
+            private int ID = -1; //-1 - unblocked, >0 - blocked
+
+            public void Lock()
+            {
+                int currentID = Thread.CurrentThread.ManagedThreadId;
+                while (Interlocked.CompareExchange(ref ID, currentID, -1) != -1)
+                {
+                    Thread.Sleep(10);
+                }
+            }
+
+            public void Unlock()
+            {
+                int currentID = Thread.CurrentThread.ManagedThreadId;
+                Interlocked.CompareExchange(ref ID, -1, currentID);
+            }
+        }
+                static void Main(string[] args)
+        {
+        }
+    }
