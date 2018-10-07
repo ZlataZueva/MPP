@@ -43,12 +43,12 @@ namespace Lab3
             {
                 for (int i = 0; i < n; i++)
                 {
-                    //Console.WriteLine("Thread {0} is waiting for mutex...", Thread.CurrentThread.ManagedThreadId);
-                    //SharedResource.mtx.Lock();
+                    Console.WriteLine("Thread {0} is waiting for mutex...", Thread.CurrentThread.ManagedThreadId);
+                    SharedResource.mtx.Lock();
                     Console.WriteLine("Thread {0} has accessed the variable", Thread.CurrentThread.ManagedThreadId);
                     SharedResource.Counter++;
                     Console.WriteLine("Thread {0} has changed the variable value to {1}", Thread.CurrentThread.ManagedThreadId, SharedResource.Counter);
-                    //SharedResource.mtx.Unlock();
+                    SharedResource.mtx.Unlock();
                     Thread.Sleep(0);
                 }
             }
@@ -57,12 +57,12 @@ namespace Lab3
             {
                 for (int i = 0; i < n; i++)
                 {
-                    //Console.WriteLine("Thread {0} is waiting for mutex...", Thread.CurrentThread.ManagedThreadId);
-                    //SharedResource.mtx.Lock();
+                    Console.WriteLine("Thread {0} is waiting for mutex...", Thread.CurrentThread.ManagedThreadId);
+                    SharedResource.mtx.Lock();
                     Console.WriteLine("Thread {0} has accessed the variable", Thread.CurrentThread.ManagedThreadId);
                     SharedResource.Counter--;
                     Console.WriteLine("Thread {0} has changed the variable value to {1}", Thread.CurrentThread.ManagedThreadId, SharedResource.Counter);
-                    //SharedResource.mtx.Unlock();
+                    SharedResource.mtx.Unlock();
                     Thread.Sleep(0);
                 }
             }
