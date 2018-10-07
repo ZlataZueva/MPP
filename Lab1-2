@@ -142,6 +142,7 @@ namespace Lab2
 
         static void Main(string[] args)
         {
+            try
             {
                 FileCopier.CheckDirNames(args, out source_dir, out target_dir);
             }
