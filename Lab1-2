@@ -40,14 +40,15 @@ namespace Lab2
                 {
                     if (TaskDelegateQueue.Count > 0)
                     {
+                        Tuple<TaskDelegate, object> task;
                         lock (lockobj)
                         {
                             if (TaskDelegateQueue.Count > 0)
                             {
                                 Tuple<TaskDelegate, object> task = TaskDelegateQueue.Dequeue();
-                                task.Item1?.Invoke(task.Item2);
                             }
                         }
+                        task?.Item1?.Invoke(task.Item2);
                     }
                 }
             }
