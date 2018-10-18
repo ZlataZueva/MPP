@@ -40,7 +40,7 @@ namespace Lab2
                 {
                     if (TaskDelegateQueue.Count > 0)
                     {
-                        Tuple<TaskDelegate, object> task;
+                        Tuple<TaskDelegate, object> task = null;
                         lock (lockobj)
                         {
                             if (TaskDelegateQueue.Count > 0)
