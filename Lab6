@@ -1,0 +1,104 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+
+namespace Lab6
+{
+    class DynamicList<T> : IEnumerable<T>
+    {
+        private T[] T_arr;
+        private int nextPos = 0;
+        private int blockSize = 8;
+
+        public void Add(T value)
+        {
+            AllocateMoreMemory();
+            T_arr[nextPos] = value;
+            nextPos++;
+        }
+
+        public void RemoveAt(int index)
+        {
+            var newT_arr = new T[T_arr.Length - 1];
+            Array.Copy(T_arr, newT_arr, index);
+            Array.Copy(T_arr, index + 1, newT_arr, index, T_arr.Length - index - 1);
+            T_arr = newT_arr;
+            nextPos--;
+        }
+
+        public void Remove(T value)
+        {
+            RemoveAt(Array.IndexOf(T_arr, value));
+        }
+
+        public void Clear()
+        {
+            T_arr = null;
+            nextPos = 0;
+        }
+
+        public int Count
+        {
+            get { return nextPos; }
+        }
+
+        public T this[int index]
+        {
+            get { return T_arr[index]; }
+            set { T_arr[index] = value; }
+        }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            return ((IEnumerable<T>)T_arr).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            yield return ((IEnumerable<T>)T_arr).GetEnumerator();
+        }
+
+
+        private void AllocateMoreMemory()
+        {
+            if (T_arr == null)
+            {
+                T_arr = new T[blockSize];
+            }
+            if (nextPos == T_arr.Length)
+            {
+                var newT_arr = new T[T_arr.Length + blockSize];
+                Array.Copy(T_arr, newT_arr, T_arr.Length);
+                T_arr = newT_arr;
+            }
+        }
+    }
+
+    static class Program
+    {
+        static void Main(string[] args)
+        {
+            var dynamicArr = new DynamicList<int>();
+            for (var i = 0; i < 64; i++)
+            {
+                dynamicArr.Add(i);
+            }
+            for (int i = 0; i<64; i++)
+            {
+                Console.Write(dynamicArr[i] + " ");
+            }
+            Console.WriteLine();
+
+            for (var i = 30; i <= 50; i++)
+            {
+                dynamicArr.RemoveAt(30);
+            }
+            foreach (var element in dynamicArr)
+            {
+                Console.Write(element + " ");
+            }
+
+            Console.ReadKey();
+        }
+    }
+}
