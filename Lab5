@@ -1,10 +1,7 @@
 using System;
 using System.Threading;
-using System.Collections.Generic;
 using System.Linq;
 using System.IO;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Lab5
 {
@@ -12,131 +9,67 @@ namespace Lab5
     {
         public delegate void TaskDelegate();
 
-        public class TaskQueue : IDisposable
-        {
-
-            Thread[] ThreadsPool;
-            int ThreadsNum = 0;
-            object lockobj = new object();
-
-           Queue<TaskDelegate> TasksQueue = new Queue<TaskDelegate>();
-
-            public TaskQueue(int ThreadsNum)
-            {
-                ThreadsPool = new Thread[ThreadsNum];
-                this.ThreadsNum = ThreadsNum;
-                for (int n = 0; n < ThreadsNum; n++)
-                {
-                    ThreadsPool[n] = new Thread(CompletingTasks) { IsBackground = true };
-                    ThreadsPool[n].Start();
-                }
-            }
-
-            public void EnqueueTask(TaskDelegate task)
-            {
-                TasksQueue.Enqueue(task);
-            }
-
-            void CompletingTasks()
-            {
-                while (true)
-                {
-                    if (TasksQueue.Count > 0)
-                    {
-                        TaskDelegate task = null;
-                        lock (lockobj)
-                        {
-                            if (TasksQueue.Count > 0)
-                            {
-                                task = TasksQueue.Dequeue();
-                            }
-                        }
-                        task?.Invoke();
-                    }
-                }
-            }
-
-            public void Dispose()
-            {
-                for (int n = 0; n < ThreadsNum; n++)
-                {
-                    ThreadsPool[n].Interrupt();
-                }
-            }
-
-        }
-
         private static class Parallel
         {
-            static CountdownEvent countEvent = new CountdownEvent(1);
+            static CountdownEvent countEvent;
 
             public static void WaitAll(TaskDelegate[] delegates_arr)
             {
                 int tasks_num = delegates_arr.Count();
-                //countEvent = new CountdownEvent(tasks_num);
-                using (TaskQueue q = new TaskQueue(5))
-                { 
-                    foreach (TaskDelegate del in delegates_arr)
-                    {
-                        q.EnqueueTask(()=>WaitOne(del));
-                    }
-                    countEvent.Wait();
+                countEvent = new CountdownEvent(tasks_num);
+                foreach (TaskDelegate del in delegates_arr)
+                {
+                    ThreadPool.QueueUserWorkItem(WaitOne, del);
                 }
+                countEvent.Wait();
             }
 
-            private static void WaitOne (TaskDelegate del)
+            private static void WaitOne(object del)
             {
-                //countEvent.Signal();
-                del?.Invoke();
+                (del as TaskDelegate).Invoke();
+                countEvent.Signal();
             }
         }
 
-        private static long FindDirSize (string dir)
+        private static class DirectoryInfo
         {
-            long res = 0;
-            if (!Directory.Exists(dir))
-            {
-                return 0;
-            }
-            string[] files_names = Directory.GetFiles(dir,"*.*",SearchOption.AllDirectories);
-            int files_num = files_names.Count();
-            //string[] dirs_names = Directory.GetDirectories(dir);
-            //, dirs_num = dirs_names.Count();
-            TaskDelegate[] tasks_arr = new TaskDelegate[files_num];
-            for (int i=0; i<files_num; i++)
-            {
-                string filename = files_names[i];
-                tasks_arr[i] = () => {res+=FindFileSize(filename); };
-            }
-            /*for (int i = 0; i < dirs_num; i++)
-            {
-                string dirname = dirs_names[i];
-                tasks_arr[i+files_num] = () => {res += FindDirSize(dirname); };
-            }*/
-            /*foreach(string d in dirs_names)
-            {
-                res += FindDirSize(d);
-            }*/
-            Parallel.WaitAll(tasks_arr);
-            return res;
-        }
+            private static long totalSize;
 
-        private static long FindFileSize(string file)
-        {
-            if (!File.Exists(file))
-                return 0;
-            FileInfo finf = new FileInfo(file);
-            if (finf == null)
-                return 0;
-            Console.WriteLine("+ {0}: {1} (Thread{2})",finf.Name, finf.Length,Thread.CurrentThread.ManagedThreadId);
-            return finf.Length;
+            public static long FindSize(string dirName)
+            {
+                totalSize = 0;
+                if (!Directory.Exists(dirName))
+                {
+                    return 0;
+                }
+                string[] files_names = Directory.GetFiles(dirName, "*.*", SearchOption.AllDirectories);
+                int files_num = files_names.Count();
+                TaskDelegate[] tasks_arr = new TaskDelegate[files_num];
+                for (int i = 0; i < files_num; i++)
+                {
+                    string filename = files_names[i];
+                    tasks_arr[i] = () => { AddFileSize(filename); };
+                }
+                Parallel.WaitAll(tasks_arr);
+                return totalSize;
+            }
+
+            private static void AddFileSize(string fName)
+            {
+                if (!File.Exists(fName))
+                    return;
+                FileInfo fInfo = new FileInfo(fName);
+                if (fInfo == null)
+                    return;
+                Console.WriteLine("+ {0}: {1} (Thread{2})", fInfo.Name, fInfo.Length, Thread.CurrentThread.ManagedThreadId);
+                Interlocked.Exchange(ref totalSize, fInfo.Length+totalSize);
+            }
         }
 
         static void Main(string[] args)
         {
-            //Parallel.WaitAll(new TaskDelegate[] { () => { Thread.Sleep(3000); Console.WriteLine("Slept 3"); }, () => { Thread.Sleep(5000); Console.WriteLine("Slept 5"); }, () => { Thread.Sleep(10000); Console.WriteLine("Slept 10"); } });
-            string dir = @"C:\Users\ZlatKa\Pictures\фото";
-            Console.WriteLine("Size of directory {0} = {1}",dir, FindDirSize(dir));
+            string dir = @"C:\Users\ZlatKa\Pictures";
+            Console.WriteLine("Size of directory {0} = {1}", dir, DirectoryInfo.FindSize(dir));
             Console.WriteLine("Program finished");
             Console.ReadLine();
         }
